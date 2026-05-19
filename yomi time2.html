@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>YOMI TIME</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Material Design 3 Tokens (Red Theme) */
+  --md-sys-color-primary: #BA1A1A;
+  --md-sys-color-on-primary: #FFFFFF;
+  --md-sys-color-primary-container: #FFDAD6;
+  --md-sys-color-on-primary-container: #410002;
+  --md-sys-color-surface: #FFF8F7;
+  --md-sys-color-on-surface: #201A19;
+  --md-sys-color-surface-variant: #F4DDDB;
+  --md-sys-color-on-surface-variant: #534341;
+  --md-sys-color-surface-container: #FCEAE8;
+  --md-sys-color-surface-container-highest: #E4D7D5;
+  --md-sys-color-outline: #857371;
+  
+  --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-duration-medium: 0.3s;
+  --md-sys-motion-duration-long: 0.5s;
+}
+
+body.mourning { filter: grayscale(100%) contrast(0.95); }
+
+*, *::before, *::after {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+  margin: 0; padding: 0;
+}
+
+body {
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  font-family: 'Roboto', "Helvetica Neue", Helvetica, Arial, sans-serif;
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: none;
+}
+
+/* ── 启动遮罩 ── */
+#mask {
+  position: fixed; inset: 0; background: var(--md-sys-color-surface); z-index: 900;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.5s ease, visibility 0.5s;
+}
+#mask.gone { opacity: 0; visibility: hidden; }
+
+#dot {
+  width: 16px; height: 16px; background: var(--md-sys-color-primary); border-radius: 50%;
+  transform: scale(0);
+  transition: transform 0.5s var(--md-sys-motion-easing-emphasized);
+}
+#dot.pop   { transform: scale(1); }
+#dot.burst { transform: scale(150); opacity: 0; transition: transform 0.4s ease-in, opacity 0.3s 0.1s ease-in; }
+
+/* ── 视图容器 ── */
+#main-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+}
+
+.tab-view {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  opacity: 0; pointer-events: none;
+  transform: translateY(20px);
+  transition: opacity var(--md-sys-motion-duration-medium) ease, 
+              transform var(--md-sys-motion-duration-long) var(--md-sys-motion-easing-emphasized);
+}
+.tab-view.active {
+  opacity: 1; pointer-events: auto;
+  transform: translateY(0);
+  z-index: 10;
+}
+
+/* ================= CLOCK VIEW ================= */
+#header {
+  padding: max(env(safe-area-inset-top), 48px) 24px 16px;
+  cursor: pointer; user-select: none; flex-shrink: 0;
+}
+#brand {
+  font-size: 11px; font-weight: 900; letter-spacing: 2px;
+  color: var(--md-sys-color-primary); margin-bottom: 12px;
+  display: flex; align-items: center; gap: 8px; text-transform: uppercase;
+}
+#led {
+  width: 8px; height: 8px; background: var(--md-sys-color-primary); border-radius: 50%;
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+.huge-time {
+  font-size: clamp(72px, 22vw, 112px);
+  font-weight: 700; letter-spacing: -3px; line-height: 0.9; margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+#sub { display: flex; align-items: baseline; gap: 8px; }
+.sec-text { font-size: 20px; font-weight: 700; color: var(--md-sys-color-primary); min-width: 36px; font-variant-numeric: tabular-nums; }
+.ampm-text { font-size: 13px; font-weight: 700; color: var(--md-sys-color-on-surface-variant); }
+#meta { margin-top: 12px; font-size: 12px; font-weight: 600; color: var(--md-sys-color-on-surface-variant); letter-spacing: 0.5px; }
+
+#strip {
+  display: flex; overflow-x: auto; padding: 20px 24px; gap: 12px;
+  scroll-snap-type: x mandatory; scrollbar-width: none; flex-shrink: 0;
+  -webkit-overflow-scrolling: touch;
+}
+#strip::-webkit-scrollbar { display: none; }
+.frame {
+  min-width: 76px; height: 116px;
+  background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface);
+  border-radius: 16px; padding: 14px 12px; scroll-snap-align: center;
+  display: flex; flex-direction: column; justify-content: space-between;
+  cursor: pointer; position: relative; overflow: hidden;
+  transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-emphasized);
+  user-select: none;
+}
+.frame::after { content: ''; position: absolute; inset: 0; background: currentColor; opacity: 0; transition: opacity 0.2s; }
+.frame:active::after { opacity: 0.12; }
+.frame.active {
+  background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
+  transform: scale(1.06); box-shadow: 0 8px 20px rgba(186, 26, 26, 0.25);
+}
+.f-m { font-size: 10px; font-weight: 700; opacity: 0.6; }
+.f-d { font-size: 34px; font-weight: 700; line-height: 1; letter-spacing: -1px; margin-top: 2px; }
+.f-w { font-size: 10px; font-weight: 700; opacity: 0.7; text-transform: uppercase; }
+.f-e { font-size: 9px; color: var(--md-sys-color-primary); font-weight: 900; margin-top: 4px; min-height: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.frame.active .f-e { color: var(--md-sys-color-primary-container); }
+
+#view {
+  flex: 1; min-height: 0; margin: 8px 24px 24px; padding: 24px;
+  background: var(--md-sys-color-surface-container); border-radius: 24px;
+  display: flex; flex-direction: column;
+}
+#v-title { font-size: 24px; font-weight: 700; margin-bottom: 10px; line-height: 1.2; }
+#v-body  { font-size: 15px; color: var(--md-sys-color-on-surface-variant); line-height: 1.6; max-width: 90%; }
+
+/* ================= TIMER VIEW ================= */
+#view-timer { align-items: center; justify-content: center; padding: 24px; }
+.ring-container { position: relative; width: 280px; height: 280px; display: flex; align-items: center; justify-content: center; }
+.ring-svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: var(--md-sys-color-surface-container-highest); stroke-width: 8; }
+.ring-progress { fill: none; stroke: var(--md-sys-color-primary); stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 0.1s linear; }
+.timer-display { font-size: 56px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -2px; z-index: 1; }
+
+.timer-chips { display: flex; gap: 12px; margin-top: 40px; flex-wrap: wrap; justify-content: center; }
+.chip {
+  padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 600;
+  background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface);
+  border: 1px solid var(--md-sys-color-outline); cursor: pointer;
+  transition: background 0.2s; user-select: none;
+}
+.chip:active { background: var(--md-sys-color-surface-variant); }
+
+/* ================= STOPWATCH VIEW ================= */
+#view-stopwatch { padding: max(env(safe-area-inset-top), 48px) 24px 24px; display: flex; flex-direction: column; }
+.sw-display-wrapper { text-align: center; margin-bottom: 32px; margin-top: 20px; }
+.sw-ms { font-size: 24px; color: var(--md-sys-color-primary); font-weight: 700; font-variant-numeric: tabular-nums; }
+.laps-container {
+  flex: 1; overflow-y: auto; background: var(--md-sys-color-surface-container);
+  border-radius: 24px; padding: 16px; display: flex; flex-direction: column; gap: 8px;
+}
+.laps-container::-webkit-scrollbar { display: none; }
+.lap-item {
+  display: flex; justify-content: space-between; padding: 12px 16px;
+  background: var(--md-sys-color-surface); border-radius: 12px;
+  font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums;
+  animation: slide-in 0.3s var(--md-sys-motion-easing-emphasized);
+}
+@keyframes slide-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+.lap-num { color: var(--md-sys-color-on-surface-variant); }
+.lap-time { color: var(--md-sys-color-on-surface); }
+
+/* ================= FAB & BOTTOM NAV ================= */
+.fab-container {
+  position: fixed; bottom: max(env(safe-area-inset-bottom), 96px); right: 24px;
+  display: flex; gap: 16px; z-index: 500;
+}
+.fab {
+  background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container);
+  height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 0 20px; font-size: 14px; font-weight: 600; letter-spacing: 0.5px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1); cursor: pointer; user-select: none;
+  transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-emphasized);
+}
+.fab.secondary { background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface); padding: 0; width: 56px; border-radius: 50%; display: none; }
+.fab:active { transform: scale(0.92); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.fab svg { width: 24px; height: 24px; fill: currentColor; }
+
+#bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; height: max(env(safe-area-inset-bottom), 80px);
+  background: var(--md-sys-color-surface-container);
+  display: flex; justify-content: space-around; align-items: center;
+  padding-bottom: env(safe-area-inset-bottom); z-index: 600;
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; height: 100%; cursor: pointer; user-select: none; color: var(--md-sys-color-on-surface-variant);
+  transition: color 0.2s;
+}
+.nav-icon-wrapper {
+  width: 64px; height: 32px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
+  transition: background var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-emphasized);
+}
+.nav-item svg { width: 24px; height: 24px; fill: currentColor; transition: transform 0.2s; }
+.nav-label { font-size: 12px; font-weight: 600; }
+.nav-item.active { color: var(--md-sys-color-on-surface); }
+.nav-item.active .nav-icon-wrapper { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.nav-item:active svg { transform: scale(0.9); }
+
+/* ── 效果层 ── */
+#cv    { position: fixed; inset: 0; pointer-events: none; z-index: 100; }
+#flash { position: fixed; inset: 0; background: #fff; opacity: 0; z-index: 800; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div id="mask"><div id="dot"></div></div>
+<div id="flash"></div>
+<canvas id="cv"></canvas>
+
+<div id="main-container">
+  <!-- CLOCK VIEW -->
+  <div id="view-clock" class="tab-view active">
+    <div id="header" onclick="snapToday()">
+      <div id="brand"><div id="led"></div>YOMI TIME</div>
+      <div id="clock" class="huge-time">00:00</div>
+      <div id="sub"><div id="sec" class="sec-text">:00</div><div id="ampm" class="ampm-text">--</div></div>
+      <div id="meta">CALIBRATING…</div>
+    </div>
+    <div id="strip"></div>
+    <div id="view">
+      <div id="v-title">—</div>
+      <div id="v-body">—</div>
+    </div>
+  </div>
+
+  <!-- TIMER VIEW -->
+  <div id="view-timer" class="tab-view">
+    <div class="ring-container">
+      <svg class="ring-svg" viewBox="0 0 100 100">
+        <circle class="ring-bg" cx="50" cy="50" r="44"></circle>
+        <circle id="timer-ring" class="ring-progress" cx="50" cy="50" r="44" stroke-dasharray="276.46" stroke-dashoffset="0"></circle>
+      </svg>
+      <div id="timer-text" class="timer-display">00:00</div>
+    </div>
+    <div class="timer-chips">
+      <div class="chip" onclick="addTimer(60)">+ 1 MIN</div>
+      <div class="chip" onclick="addTimer(300)">+ 5 MIN</div>
+      <div class="chip" onclick="addTimer(600)">+ 10 MIN</div>
+      <div class="chip" onclick="resetTimer()">CLEAR</div>
+    </div>
+  </div>
+
+  <!-- STOPWATCH VIEW -->
+  <div id="view-stopwatch" class="tab-view">
+    <div class="sw-display-wrapper">
+      <div id="sw-text" class="huge-time">00:00</div>
+      <div id="sw-ms" class="sw-ms">.00</div>
+    </div>
+    <div id="laps-container" class="laps-container">
+      <!-- Laps go here -->
+    </div>
+  </div>
+</div>
+
+<!-- FABs -->
+<div class="fab-container">
+  <div id="fab-secondary" class="fab secondary" onclick="handleSecondaryAction()">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
+  </div>
+  <div id="fab-main" class="fab" onclick="handleMainAction()">
+    <svg id="fab-icon" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+    <span id="fab-label">TODAY</span>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav id="bottom-nav">
+  <div class="nav-item active" onclick="switchTab('clock', this)">
+    <div class="nav-icon-wrapper"><svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg></div>
+    <span class="nav-label">Clock</span>
+  </div>
+  <div class="nav-item" onclick="switchTab('timer', this)">
+    <div class="nav-icon-wrapper"><svg viewBox="0 0 24 24"><path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg></div>
+    <span class="nav-label">Timer</span>
+  </div>
+  <div class="nav-item" onclick="switchTab('stopwatch', this)">
+    <div class="nav-icon-wrapper"><svg viewBox="0 0 24 24"><path d="M22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM7.88 3.39L6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM12.5 8H11v6l4.75 2.85.75-1.23-4-2.37V8zM12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 16c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg></div>
+    <span class="nav-label">Stopwatch</span>
+  </div>
+</nav>
+
+<script>
+/* ================= DATA & UTILS ================= */
+const DB = {
+  "01-01":{ n:"元旦", d:"时间的矢量在此处重置。", egg:"burst" },
+  "01-15":{ n:"元宵节", d:"正月十五，火树银花，千灯如昼。" },
+  "02-14":{ n:"情人节", d:"Valentine's Day." },
+  "03-08":{ n:"妇女节", d:"致敬所有女性。" },
+  "03-21":{ n:"春分", d:"昼夜等长，春和景明。" },
+  "04-04":{ n:"清明", d:"慎终追远，寒食祭祖。" },
+  "04-22":{ n:"地球日", d:"EARTH DAY. 珍视这颗蓝色星球。" },
+  "05-01":{ n:"劳动节", d:"致敬一切辛勤的劳动者。", egg:"burst" },
+  "05-05":{ n:"立夏", d:"夏季伊始，万物竞长。" },
+  "06-01":{ n:"儿童节", d:"愿所有人永葆赤子之心。" },
+  "06-04":{ n:"", d:"今日静默。", isMourning:true },
+  "06-21":{ n:"夏至", d:"一年中白昼最长的一天。" },
+  "07-07":{ n:"七夕", d:"银汉迢迢暗渡。" },
+  "08-08":{ n:"立秋", d:"暑气渐消，金风送爽。" },
+  "09-09":{ n:"重阳", d:"登高望远，遥寄思念。" },
+  "09-19":{ n:"摄影日", d:"WORLD PHOTOGRAPHY DAY. 致敬定格瞬间的观察者。", egg:"flash" },
+  "09-23":{ n:"秋分", d:"金秋平分昼夜。" },
+  "10-01":{ n:"国庆节", d:"举国同庆，盛世繁荣。", egg:"burst" },
+  "12-13":{ n:"", d:"国家公祭日。铭记历史，守望和平。", isMourning:true },
+  "12-22":{ n:"冬至", d:"一年中最长的夜，此后光明渐回。" },
+  "12-25":{ n:"圣诞节", d:"Merry Christmas." },
+  "12-31":{ n:"跨年夜", d:"另一段时间的序章即将开始。", egg:"burst" },
+};
+const MO = ["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE","JULY","AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"];
+const WK = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
+const $ = id => document.getElementById(id);
+
+function key(d) { return pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
+
+/* 兼容性极强的补零函数 */
+function pad(n) { 
+  let s = String(Math.floor(n));
+  return s.length < 2 ? '0' + s : s; 
+}
+
+/* ================= ICONS ================= */
+const ICONS = {
+  today: '<path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/>',
+  play: '<path d="M8 5v14l11-7z"/>',
+  pause: '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>',
+  stop: '<path d="M6 6h12v12H6z"/>',
+  lap: '<path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z"/>'
+};
+
+/* ================= STATE ================= */
+let currentTab = 'clock';
+
+/* ================= INIT ================= */
+window.addEventListener('DOMContentLoaded', () => {
+  const dot = $('dot'), mask = $('mask');
+  setTimeout(() => dot.classList.add('pop'), 120);
+  setTimeout(() => dot.classList.add('burst'), 500);
+  setTimeout(() => { mask.classList.add('gone'); buildStrip(); tickClock(); updateFAB(); }, 800);
+});
+
+/* ================= TAB SWITCHING ================= */
+function switchTab(tab, el) {
+  if (currentTab === tab) return;
+  currentTab = tab;
+  
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  
+  document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
+  $(`view-${tab}`).classList.add('active');
+  
+  updateFAB();
+}
+
+function updateFAB() {
+  const main = $('fab-main'), sec = $('fab-secondary'), icon = $('fab-icon'), label = $('fab-label');
+  sec.style.display = 'none';
+  main.style.width = 'auto';
+  label.style.display = 'inline';
+  
+  if (currentTab === 'clock') {
+    icon.innerHTML = ICONS.today; label.textContent = 'TODAY';
+  } else if (currentTab === 'timer') {
+    icon.innerHTML = timerRunning ? ICONS.pause : ICONS.play;
+    label.textContent = timerRunning ? 'PAUSE' : 'START';
+    if (timerTotal > 0) {
+      sec.style.display = 'flex';
+      sec.innerHTML = `<svg viewBox="0 0 24 24">${ICONS.stop}</svg>`;
+    }
+  } else if (currentTab === 'stopwatch') {
+    icon.innerHTML = swRunning ? ICONS.pause : ICONS.play;
+    label.textContent = swRunning ? 'PAUSE' : 'START';
+    if (swElapsed > 0 || swRunning) {
+      sec.style.display = 'flex';
+      sec.innerHTML = `<svg viewBox="0 0 24 24">${swRunning ? ICONS.lap : ICONS.stop}</svg>`;
+    }
+  }
+}
+
+function handleMainAction() {
+  if (currentTab === 'clock') snapToday();
+  else if (currentTab === 'timer') toggleTimer();
+  else if (currentTab === 'stopwatch') toggleStopwatch();
+}
+
+function handleSecondaryAction() {
+  if (currentTab === 'timer') resetTimer();
+  else if (currentTab === 'stopwatch') {
+    if (swRunning) recordLap(); else resetStopwatch();
+  }
+}
+
+/* ================= CLOCK LOGIC ================= */
+function buildStrip() {
+  const strip = $('strip'), today = new Date(); today.setHours(0,0,0,0);
+  const frag = document.createDocumentFragment();
+  for (let i = -30; i <= 365; i++) {
+    const d = new Date(today); d.setDate(today.getDate() + i);
+    const k = key(d), inf = DB[k] || null, el = document.createElement('div');
+    el.className = 'frame' + (i === 0 ? ' today-frame' : '');
+    if (inf && inf.isMourning) el.innerHTML = `<div class="f-d">${d.getDate()}</div><div></div>`;
+    else el.innerHTML = `<div><div class="f-m">${d.getMonth()+1}月</div><div class="f-d">${d.getDate()}</div></div><div><div class="f-w">${WK[d.getDay()]}</div><div class="f-e">${inf?inf.n:''}</div></div>`;
+    el.addEventListener('click', e => pick(el, d, inf, e));
+    frag.appendChild(el);
+  }
+  strip.appendChild(frag); snapToday();
+}
+
+function pick(el, d, inf, e) {
+  document.querySelectorAll('.frame.active').forEach(f => f.classList.remove('active'));
+  el.classList.add('active');
+  $('meta').textContent = `${d.getFullYear()} / ${MO[d.getMonth()]} / ${pad(d.getDate())}`;
+  document.body.classList.toggle('mourning', !!(inf && inf.isMourning));
+  if (inf && inf.egg && e) fx(inf.egg, e);
+  $('v-title').textContent = (inf && inf.n) ? inf.n : 'REALTIME';
+  $('v-body').textContent = (inf && inf.d) ? inf.d : '一切如常。未发现显著的时间异常。';
+  if (navigator.vibrate) navigator.vibrate(8);
+}
+
+function snapToday() {
+  const el = document.querySelector('.today-frame');
+  if (!el) return;
+  $('strip').scrollTo({ left: el.offsetLeft - (innerWidth / 2) + (el.offsetWidth / 2), behavior: 'smooth' });
+  const d = new Date(); d.setHours(0,0,0,0);
+  pick(el, d, DB[key(d)] || null, null);
+}
+
+let lastSec = -1;
+function tickClock() {
+  const n = new Date(), s = n.getSeconds();
+  if (s !== lastSec) {
+    $('clock').textContent = pad(n.getHours()) + ':' + pad(n.getMinutes());
+    $('sec').textContent = ':' + pad(s);
+    $('ampm').textContent = n.getHours() < 12 ? 'AM' : 'PM';
+    lastSec = s;
+  }
+  requestAnimationFrame(tickClock);
+}
+
+/* ================= TIMER LOGIC ================= */
+let timerTotal = 0, timerLeft = 0, timerRunning = false, timerEnd = 0, timerRaf;
+const RING_CIRCUMFERENCE = 276.46;
+
+function addTimer(sec) {
+  if (timerRunning) return;
+  timerTotal += sec; timerLeft = timerTotal;
+  updateTimerUI(); updateFAB();
+}
+
+function resetTimer() {
+  timerRunning = false; timerTotal = 0; timerLeft = 0;
+  cancelAnimationFrame(timerRaf);
+  updateTimerUI(); updateFAB();
+}
+
+function toggleTimer() {
+  if (timerTotal === 0) return;
+  if (timerRunning) {
+    timerRunning = false;
+    timerLeft = Math.max(0, (timerEnd - Date.now()) / 1000);
+    cancelAnimationFrame(timerRaf);
+  } else {
+    timerRunning = true;
+    timerEnd = Date.now() + timerLeft * 1000;
+    timerRaf = requestAnimationFrame(tickTimer);
+  }
+  updateFAB();
+}
+
+function tickTimer() {
+  if (!timerRunning) return;
+  timerLeft = Math.max(0, (timerEnd - Date.now()) / 1000);
+  updateTimerUI();
+  if (timerLeft <= 0) {
+    timerRunning = false; timerTotal = 0;
+    updateFAB(); fx('flash'); 
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  } else {
+    timerRaf = requestAnimationFrame(tickTimer);
+  }
+}
+
+function updateTimerUI() {
+  const m = Math.floor(timerLeft / 60), s = Math.floor(timerLeft % 60);
+  $('timer-text').textContent = pad(m) + ':' + pad(s);
+  const offset = timerTotal > 0 ? RING_CIRCUMFERENCE * (1 - timerLeft / timerTotal) : 0;
+  $('timer-ring').style.strokeDashoffset = offset;
+}
+
+/* ================= STOPWATCH LOGIC (重写增强版) ================= */
+let swStart = 0, swElapsed = 0, swRunning = false, swRaf = null, lapCount = 0;
+
+function toggleStopwatch() {
+  if (swRunning) {
+    swRunning = false;
+    swElapsed += Date.now() - swStart;
+    if (swRaf) cancelAnimationFrame(swRaf);
+    swRaf = null;
+  } else {
+    swRunning = true;
+    swStart = Date.now();
+    swRaf = requestAnimationFrame(tickStopwatch);
+  }
+  updateFAB();
+}
+
+function resetStopwatch() {
+  swRunning = false; 
+  swElapsed = 0; 
+  lapCount = 0;
+  if (swRaf) cancelAnimationFrame(swRaf);
+  swRaf = null;
+  $('laps-container').innerHTML = '';
+  updateStopwatchUI(0); 
+  updateFAB();
+}
+
+function formatSW(ms) {
+  ms = Math.max(0, ms);
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  const ms10 = Math.floor((ms % 1000) / 10);
+  return pad(m) + ':' + pad(s) + '.' + pad(ms10);
+}
+
+function updateStopwatchUI(ms) {
+  ms = Math.max(0, ms);
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  const ms10 = Math.floor((ms % 1000) / 10);
+  
+  $('sw-text').textContent = pad(m) + ':' + pad(s);
+  $('sw-ms').textContent = '.' + pad(ms10);
+}
+
+function tickStopwatch() {
+  if (!swRunning) return;
+  updateStopwatchUI(swElapsed + (Date.now() - swStart));
+  swRaf = requestAnimationFrame(tickStopwatch);
+}
+
+function recordLap() {
+  lapCount++;
+  const total = swElapsed + (Date.now() - swStart);
+  const el = document.createElement('div');
+  el.className = 'lap-item';
+  el.innerHTML = '<span class="lap-num">Lap ' + pad(lapCount) + '</span><span class="lap-time">' + formatSW(total) + '</span>';
+  
+  const container = $('laps-container');
+  // 兼容性极强的插入方式
+  if (container.firstChild) {
+    container.insertBefore(el, container.firstChild);
+  } else {
+    container.appendChild(el);
+  }
+}
+
+/* ================= EFFECTS ================= */
+let particles = [], animFrame = null;
+function fx(type, e) {
+  if (type === 'flash') {
+    const f = $('flash'); f.style.transition = 'none'; f.style.opacity = '0.9';
+    requestAnimationFrame(() => { f.style.transition = 'opacity 0.5s cubic-bezier(0.2,0,0,1)'; f.style.opacity = '0'; });
+    return;
+  }
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  if (!animFrame) { cv.width = innerWidth; cv.height = innerHeight; }
+  const cx = e ? e.clientX : innerWidth / 2, cy = e ? e.clientY : innerHeight / 2;
+  const newPts = Array.from({length: 60}, (_, i) => {
+    const a = Math.PI * 2 * i / 60, s = Math.random() * 8 + 4;
+    return { x: cx, y: cy, vx: Math.cos(a) * s, vy: Math.sin(a) * s - Math.random() * 3, life: 1, dec: 0.015 + Math.random() * 0.01, sz: Math.random() * 4 + 2, col: Math.random() > 0.5 ? '#BA1A1A' : (Math.random() > 0.5 ? '#FFDAD6' : '#201A19') };
+  });
+  particles.push(...newPts);
+  if (!animFrame) {
+    (function loop() {
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      let alive = false;
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        if (p.life <= 0) { particles.splice(i, 1); continue; }
+        alive = true; p.vx *= 0.96; p.vy += 0.2; p.x += p.vx; p.y += p.vy; p.life -= p.dec;
+        ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, p.sz, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      if (alive) animFrame = requestAnimationFrame(loop); else { animFrame = null; ctx.clearRect(0, 0, cv.width, cv.height); }
+    })();
+  }
+}
+</script>
+</body>
+</html>
