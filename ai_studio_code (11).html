@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>YOMI TIME</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Material Design 3 Tokens (Red Theme) */
+  --md-sys-color-primary: #BA1A1A;
+  --md-sys-color-on-primary: #FFFFFF;
+  --md-sys-color-primary-container: #FFDAD6;
+  --md-sys-color-on-primary-container: #410002;
+  --md-sys-color-surface: #FFF8F7;
+  --md-sys-color-on-surface: #201A19;
+  --md-sys-color-surface-variant: #F4DDDB;
+  --md-sys-color-on-surface-variant: #534341;
+  --md-sys-color-surface-container: #FCEAE8;
+  --md-sys-color-surface-container-highest: #E4D7D5;
+  
+  --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-duration-medium: 0.3s;
+}
+
+body.mourning { filter: grayscale(100%) contrast(0.95); }
+
+*, *::before, *::after {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+  margin: 0; padding: 0;
+}
+
+body {
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  font-family: 'Roboto', "Helvetica Neue", Helvetica, Arial, "PingFang SC", sans-serif;
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: none;
+}
+
+/* ── 启动遮罩 ── */
+#mask {
+  position: fixed; inset: 0; background: var(--md-sys-color-surface); z-index: 900;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.5s ease, visibility 0.5s;
+}
+#mask.gone { opacity: 0; visibility: hidden; }
+
+#dot {
+  width: 16px; height: 16px; background: var(--md-sys-color-primary); border-radius: 50%;
+  transform: scale(0);
+  transition: transform 0.5s var(--md-sys-motion-easing-emphasized);
+}
+#dot.pop   { transform: scale(1); }
+#dot.burst { transform: scale(150); opacity: 0; transition: transform 0.4s ease-in, opacity 0.3s 0.1s ease-in; }
+
+/* ── 头部 ── */
+#header {
+  padding: max(env(safe-area-inset-top), 48px) 24px 16px;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+#brand {
+  font-size: 11px; font-weight: 900; letter-spacing: 2px;
+  color: var(--md-sys-color-primary); margin-bottom: 12px;
+  display: flex; align-items: center; gap: 8px;
+  text-transform: uppercase;
+}
+#led {
+  width: 8px; height: 8px; background: var(--md-sys-color-primary); border-radius: 50%;
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+#clock {
+  font-size: clamp(72px, 22vw, 112px);
+  font-weight: 700;
+  letter-spacing: -3px;
+  line-height: 0.9;
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums; /* 修复数字跳动 */
+}
+
+#sub {
+  display: flex; align-items: baseline; gap: 8px;
+}
+#sec { 
+  font-size: 20px; font-weight: 700; color: var(--md-sys-color-primary); 
+  min-width: 36px; font-variant-numeric: tabular-nums;
+}
+#ampm { font-size: 13px; font-weight: 700; color: var(--md-sys-color-on-surface-variant); }
+
+#meta {
+  margin-top: 12px;
+  font-size: 12px; font-weight: 600; color: var(--md-sys-color-on-surface-variant); 
+  letter-spacing: 0.5px;
+}
+
+/* ── 胶片条 (M3 Carousel) ── */
+#strip {
+  display: flex;
+  overflow-x: auto;
+  padding: 20px 24px;
+  gap: 12px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  flex-shrink: 0;
+  -webkit-overflow-scrolling: touch;
+}
+#strip::-webkit-scrollbar { display: none; }
+
+.frame {
+  min-width: 76px; height: 116px;
+  background: var(--md-sys-color-surface-container); 
+  color: var(--md-sys-color-on-surface);
+  border-radius: 16px;
+  padding: 14px 12px;
+  scroll-snap-align: center;
+  display: flex; flex-direction: column; justify-content: space-between;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-emphasized);
+  user-select: none;
+}
+/* 模拟 M3 Ripple 效果 */
+.frame::after {
+  content: ''; position: absolute; inset: 0; background: currentColor; opacity: 0; transition: opacity 0.2s;
+}
+.frame:active::after { opacity: 0.12; }
+
+.frame.active {
+  background: var(--md-sys-color-primary); 
+  color: var(--md-sys-color-on-primary);
+  transform: scale(1.06);
+  box-shadow: 0 8px 20px rgba(186, 26, 26, 0.25);
+}
+
+.f-m { font-size: 10px; font-weight: 700; opacity: 0.6; }
+.f-d { font-size: 34px; font-weight: 700; line-height: 1; letter-spacing: -1px; margin-top: 2px; }
+.f-w { font-size: 10px; font-weight: 700; opacity: 0.7; text-transform: uppercase; }
+.f-e { font-size: 9px; color: var(--md-sys-color-primary); font-weight: 900; margin-top: 4px; min-height: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.frame.active .f-e { color: var(--md-sys-color-primary-container); }
+
+/* ── 详情区 (M3 Card) ── */
+#view {
+  flex: 1; min-height: 0;
+  margin: 8px 24px 24px;
+  padding: 24px;
+  background: var(--md-sys-color-surface-container);
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+}
+#v-title { font-size: 24px; font-weight: 700; margin-bottom: 10px; line-height: 1.2; }
+#v-body  { font-size: 15px; color: var(--md-sys-color-on-surface-variant); line-height: 1.6; max-width: 90%; }
+
+/* ── 效果层 ── */
+#cv    { position: fixed; inset: 0; pointer-events: none; z-index: 100; }
+#flash { position: fixed; inset: 0; background: #fff; opacity: 0; z-index: 800; pointer-events: none; }
+
+/* ── 重置按钮 (M3 FAB) ── */
+#reset {
+  position: fixed;
+  bottom: max(env(safe-area-inset-bottom), 32px);
+  right: 24px;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  height: 56px;
+  border-radius: 16px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 0 20px;
+  font-size: 14px; font-weight: 600; letter-spacing: 0.5px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  cursor: pointer; z-index: 500; user-select: none;
+  transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-emphasized);
+}
+#reset:active { 
+  transform: scale(0.92); 
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+}
+#reset svg { width: 20px; height: 20px; fill: currentColor; }
+</style>
+</head>
+<body>
+
+<div id="mask"><div id="dot"></div></div>
+<div id="flash"></div>
+<canvas id="cv"></canvas>
+
+<div id="header" onclick="snapToday()">
+  <div id="brand"><div id="led"></div>YOMI TIME</div>
+  <div id="clock">00:00</div>
+  <div id="sub"><div id="sec">:00</div><div id="ampm">--</div></div>
+  <div id="meta">CALIBRATING…</div>
+</div>
+
+<div id="strip"></div>
+
+<div id="view">
+  <div id="v-title">—</div>
+  <div id="v-body">—</div>
+</div>
+
+<div id="reset" onclick="snapToday()">
+  <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+  TODAY
+</div>
+
+<script>
+const DB = {
+  "01-01":{ n:"元旦",    d:"时间的矢量在此处重置。",                      egg:"burst" },
+  "01-15":{ n:"元宵节",  d:"正月十五，火树银花，千灯如昼。" },
+  "02-14":{ n:"情人节",  d:"Valentine's Day." },
+  "03-08":{ n:"妇女节",  d:"致敬所有女性。" },
+  "03-21":{ n:"春分",    d:"昼夜等长，春和景明。" },
+  "04-04":{ n:"清明",    d:"慎终追远，寒食祭祖。" },
+  "04-22":{ n:"地球日",  d:"EARTH DAY. 珍视这颗蓝色星球。" },
+  "05-01":{ n:"劳动节",  d:"致敬一切辛勤的劳动者。",                      egg:"burst" },
+  "05-05":{ n:"立夏",    d:"夏季伊始，万物竞长。" },
+  "06-01":{ n:"儿童节",  d:"愿所有人永葆赤子之心。" },
+  "06-04":{ n:"",        d:"今日静默。",                                  isMourning:true },
+  "06-21":{ n:"夏至",    d:"一年中白昼最长的一天。" },
+  "07-07":{ n:"七夕",    d:"银汉迢迢暗渡。" },
+  "08-08":{ n:"立秋",    d:"暑气渐消，金风送爽。" },
+  "09-09":{ n:"重阳",    d:"登高望远，遥寄思念。" },
+  "09-19":{ n:"摄影日",  d:"WORLD PHOTOGRAPHY DAY. 致敬定格瞬间的观察者。", egg:"flash" },
+  "09-23":{ n:"秋分",    d:"金秋平分昼夜。" },
+  "10-01":{ n:"国庆节",  d:"举国同庆，盛世繁荣。",                        egg:"burst" },
+  "12-13":{ n:"",        d:"国家公祭日。铭记历史，守望和平。",             isMourning:true },
+  "12-22":{ n:"冬至",    d:"一年中最长的夜，此后光明渐回。" },
+  "12-25":{ n:"圣诞节",  d:"Merry Christmas." },
+  "12-31":{ n:"跨年夜",  d:"另一段时间的序章即将开始。",                  egg:"burst" },
+};
+
+const MO = ["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE","JULY","AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"];
+const WK = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
+
+const $ = id => document.getElementById(id);
+
+function key(d) {
+  return String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+/* 启动 */
+window.addEventListener('DOMContentLoaded', () => {
+  const dot = $('dot'), mask = $('mask');
+  setTimeout(() => dot.classList.add('pop'),   120);
+  setTimeout(() => dot.classList.add('burst'), 500);
+  setTimeout(() => { mask.classList.add('gone'); buildStrip(); tick(); }, 800);
+});
+
+/* 胶片条 */
+function buildStrip() {
+  const strip = $('strip');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const frag  = document.createDocumentFragment();
+
+  for (let i = -30; i <= 365; i++) {
+    const d   = new Date(today); d.setDate(today.getDate() + i);
+    const k   = key(d);
+    const inf = DB[k] || null;
+    const el  = document.createElement('div');
+    el.className = 'frame' + (i === 0 ? ' today-frame' : '');
+
+    if (inf?.isMourning) {
+      el.innerHTML = `<div class="f-d">${d.getDate()}</div><div></div>`;
+    } else {
+      el.innerHTML =
+        `<div><div class="f-m">${d.getMonth()+1}月</div><div class="f-d">${d.getDate()}</div></div>` +
+        `<div><div class="f-w">${WK[d.getDay()]}</div><div class="f-e">${inf?.n||''}</div></div>`;
+    }
+
+    el.addEventListener('click', e => pick(el, d, inf, e));
+    frag.appendChild(el);
+  }
+  strip.appendChild(frag);
+  snapToday();
+}
+
+/* 选中 */
+function pick(el, d, inf, e) {
+  document.querySelectorAll('.frame.active').forEach(f => f.classList.remove('active'));
+  el.classList.add('active');
+  $('meta').textContent = `${d.getFullYear()} / ${MO[d.getMonth()]} / ${String(d.getDate()).padStart(2,'0')}`;
+  document.body.classList.toggle('mourning', !!(inf?.isMourning));
+  
+  if (inf?.egg && e) fx(inf.egg, e);
+  
+  $('v-title').textContent = inf?.n  || 'REALTIME';
+  $('v-body').textContent  = inf?.d  || '一切如常。未发现显著的时间异常。';
+  navigator.vibrate?.(8);
+}
+
+/* 今日定位 (修复居中计算 Bug) */
+function snapToday() {
+  const strip = $('strip');
+  const el    = document.querySelector('.today-frame');
+  if (!el) return;
+  
+  // 动态计算精准居中位置
+  const centerPos = el.offsetLeft - (innerWidth / 2) + (el.offsetWidth / 2);
+  strip.scrollTo({ left: centerPos, behavior: 'smooth' });
+  
+  const d = new Date(); d.setHours(0,0,0,0);
+  pick(el, d, DB[key(d)] || null, null);
+}
+
+/* 时钟 (修复跳动 Bug，采用 requestAnimationFrame) */
+let lastSec = -1;
+function tick() {
+  const n = new Date();
+  const s = n.getSeconds();
+  if (s !== lastSec) {
+    $('clock').textContent = String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+    $('sec').textContent   = ':' + String(s).padStart(2,'0');
+    $('ampm').textContent  = n.getHours() < 12 ? 'AM' : 'PM';
+    lastSec = s;
+  }
+  requestAnimationFrame(tick);
+}
+
+/* 特效 (修复多次点击闪烁 Bug，采用全局粒子池) */
+let particles = [];
+let animFrame = null;
+
+function fx(type, e) {
+  if (type === 'flash') {
+    const f = $('flash');
+    f.style.transition = 'none';
+    f.style.opacity = '0.9';
+    requestAnimationFrame(() => { 
+      f.style.transition = 'opacity 0.5s cubic-bezier(0.2,0,0,1)'; 
+      f.style.opacity = '0'; 
+    });
+    return;
+  }
+  
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  if (!animFrame) {
+    cv.width = innerWidth; 
+    cv.height = innerHeight;
+  }
+  
+  const cx = e ? e.clientX : innerWidth / 2;
+  const cy = e ? e.clientY : innerHeight / 2;
+  
+  // 生成新粒子并推入全局池
+  const newPts = Array.from({length: 60}, (_, i) => {
+    const a = Math.PI * 2 * i / 60;
+    const s = Math.random() * 8 + 4;
+    return { 
+      x: cx, y: cy, 
+      vx: Math.cos(a) * s, 
+      vy: Math.sin(a) * s - Math.random() * 3,
+      life: 1, 
+      dec: 0.015 + Math.random() * 0.01, 
+      sz: Math.random() * 4 + 2,
+      col: Math.random() > 0.5 ? '#BA1A1A' : (Math.random() > 0.5 ? '#FFDAD6' : '#201A19')
+    };
+  });
+  particles.push(...newPts);
+
+  if (!animFrame) {
+    (function loop() {
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      let alive = false;
+      
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+        alive = true; 
+        p.vx *= 0.96; 
+        p.vy += 0.2; // 重力
+        p.x += p.vx; 
+        p.y += p.vy; 
+        p.life -= p.dec;
+        
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.fillStyle = p.col;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.sz, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      
+      if (alive) {
+        animFrame = requestAnimationFrame(loop);
+      } else {
+        animFrame = null;
+        ctx.clearRect(0, 0, cv.width, cv.height);
+      }
+    })();
+  }
+}
+</script>
+</body>
+</html>
