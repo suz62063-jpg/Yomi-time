@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>YOMI TIME</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700;9..40,900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Material Design 3 - Red Theme */
+  --c-primary:         #BA1A1A;
+  --c-on-primary:      #FFFFFF;
+  --c-primary-ctr:     #FFDAD6;
+  --c-on-primary-ctr:  #410002;
+  --c-secondary-ctr:   #FFDAD6;
+  --c-on-secondary-ctr:#2C1512;
+  --c-surface:         #FFF8F7;
+  --c-on-surface:      #201A19;
+  --c-surface-var:     #F4DDDB;
+  --c-on-surface-var:  #534341;
+  --c-surface-ctr:     #FCEAE8;
+  --c-surface-ctr-hi:  #F0DEDC;
+  --c-inverse-surface: #362F2E;
+  --c-inverse-on:      #FBEAE8;
+  --c-outline:         #857371;
+  --c-outline-var:     #D8C2BF;
+  --c-error:           #BA1A1A;
+  
+  --r-s:   16px;
+  --r-m:   24px;
+  --r-l:   32px;
+  --r-xl:  40px;
+  --r-full:9999px;
+  
+  --ease-std:   cubic-bezier(0.2, 0, 0, 1);
+  --ease-in:    cubic-bezier(0.3, 0, 0.8, 0.15);
+  --ease-out:   cubic-bezier(0.05, 0.7, 0.1, 1);
+}
+
+body.mourning { filter: grayscale(1) contrast(0.95); }
+
+*, *::before, *::after {
+  box-sizing: border-box; margin: 0; padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+html { height: 100%; }
+body {
+  background: var(--c-surface); color: var(--c-on-surface);
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  height: 100dvh; overflow: hidden;
+  display: flex; flex-direction: column;
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── LAYOUT ── */
+#app { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+.view {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  opacity: 0; pointer-events: none; transform: translateY(16px) scale(0.98);
+  transition: opacity 0.4s var(--ease-out), transform 0.4s var(--ease-out);
+}
+.view.active {
+  opacity: 1; pointer-events: auto; transform: translateY(0) scale(1); z-index: 10;
+}
+
+/* ─────── CLOCK VIEW (Xiaomi 15 Adaptive) ─────── */
+#v-clock { padding-top: max(env(safe-area-inset-top), 36px); }
+#hdr { padding: 0 32px; flex-shrink: 0; cursor: pointer; user-select: none; }
+#brand { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+#led {
+  width: 8px; height: 8px; background: var(--c-primary);
+  border-radius: 50%; flex-shrink: 0;
+  animation: blink 2.4s cubic-bezier(.4,0,.6,1) infinite;
+}
+@keyframes blink { 0%,45%,55%,100% { opacity: 1; } 50% { opacity: .2; } }
+#brand-name {
+  font-size: 13px; font-weight: 700; letter-spacing: 4px;
+  color: var(--c-primary); text-transform: uppercase;
+}
+.time-row { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+#clock {
+  font-size: clamp(72px, 19vw, 116px); font-weight: 500;
+  letter-spacing: -3px; font-variant-numeric: tabular-nums; line-height: 1;
+}
+#sec {
+  font-size: clamp(24px, 5.5vw, 32px); font-weight: 700;
+  color: var(--c-primary); font-variant-numeric: tabular-nums; letter-spacing: 0;
+}
+#ampm { font-size: 16px; font-weight: 700; color: var(--c-on-surface-var); letter-spacing: 1.5px; }
+#meta {
+  font-size: 14px; font-weight: 600; letter-spacing: 2px;
+  color: var(--c-on-surface-var); text-transform: uppercase;
+  height: 20px; overflow: hidden; margin-top: 4px;
+  transition: opacity .2s, transform .3s var(--ease-out);
+}
+
+/* DATE STRIP */
+#strip {
+  position: relative;
+  display: flex; overflow-x: auto; padding: 28px 24px 16px; gap: 16px;
+  scroll-snap-type: x mandatory; scrollbar-width: none; flex-shrink: 0;
+  -webkit-overflow-scrolling: touch;
+}
+#strip::-webkit-scrollbar { display: none; }
+.frame {
+  min-width: 96px; height: 136px;
+  background: var(--c-surface-ctr); border-radius: var(--r-l);
+  padding: 20px 14px; scroll-snap-align: center;
+  display: flex; flex-direction: column; justify-content: space-between;
+  position: relative; overflow: hidden; flex-shrink: 0; cursor: pointer;
+  user-select: none; -webkit-user-select: none;
+  transition: background .3s var(--ease-std), transform .3s var(--ease-out), box-shadow .3s var(--ease-std);
+}
+.frame::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: var(--c-on-surface); opacity: 0; pointer-events: none;
+  transition: opacity .2s;
+}
+.frame:active { transform: scale(0.94); }
+.frame:active::before { opacity: .08; }
+.frame.active {
+  background: var(--c-primary); color: var(--c-on-primary);
+  transform: scale(1.08) translateY(-4px);
+  box-shadow: 0 12px 24px rgba(186, 26, 26, .25);
+}
+.frame.active:active { transform: scale(1.03) translateY(-4px); }
+.frame.active::before { background: var(--c-on-primary); }
+.f-m { font-size: 12px; font-weight: 700; opacity: .6; letter-spacing: .5px; }
+.f-d { font-size: 38px; font-weight: 700; line-height: 1; letter-spacing: -1px; margin-top: 4px; }
+.f-w { font-size: 11px; font-weight: 700; opacity: .7; text-transform: uppercase; letter-spacing: .5px; }
+.f-e { font-size: 10px; font-weight: 700; color: var(--c-primary); margin-top: 8px; min-height: 14px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.frame.active .f-e { color: var(--c-primary-ctr); }
+
+/* INFO CARD (完全防止重叠与卡死) */
+#card {
+  flex: 1; min-height: 100px; 
+  /* 留出 200px 底部安全区，绝对防止与 FAB、导航栏重叠 */
+  margin: 12px 24px max(calc(env(safe-area-inset-bottom) + 160px), 180px); 
+  padding: 32px; background: var(--c-surface-ctr); border-radius: var(--r-xl);
+  display: flex; flex-direction: column; gap: 12px; position: relative; 
+  overflow-y: auto; /* 允许内容过多时卡片内部滚动，防止溢出 */
+  transition: opacity .3s;
+}
+#card::-webkit-scrollbar { display: none; }
+#card::after {
+  content: ''; position: absolute; bottom: -45px; right: -45px;
+  width: 140px; height: 140px; border-radius: 50%;
+  background: var(--c-primary); opacity: .04; pointer-events: none;
+}
+#v-title { font-size: 26px; font-weight: 700; line-height: 1.2; letter-spacing: -.5px; }
+#v-body { font-size: 16px; color: var(--c-on-surface-var); line-height: 1.8; }
+
+/* ─────── TIMER VIEW ─────── */
+#v-timer {
+  align-items: center; justify-content: center;
+  padding: max(env(safe-area-inset-top), 64px) 32px max(calc(env(safe-area-inset-bottom) + 160px), 180px);
+  gap: 0; overflow: hidden;
+}
+.ring-wrap {
+  position: relative; flex-shrink: 0;
+  width: min(65vw, 65vh, 320px); height: min(65vw, 65vh, 320px);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .6s var(--ease-std);
+}
+.ring-svg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  transform: rotate(-90deg); overflow: visible;
+}
+.ring-track { fill: none; stroke: var(--c-surface-ctr-hi); stroke-width: 10; }
+.ring-prog {
+  fill: none; stroke: var(--c-primary); stroke-width: 10; stroke-linecap: round;
+  stroke-dasharray: 276.46; stroke-dashoffset: 0;
+  transition: stroke-dashoffset .1s linear;
+  filter: drop-shadow(0 0 12px rgba(186, 26, 26, .25));
+}
+.ring-glow {
+  fill: none; stroke: var(--c-primary); stroke-width: 28; stroke-linecap: round;
+  stroke-dasharray: 276.46; stroke-dashoffset: 0; opacity: 0;
+}
+.ring-wrap.running .ring-glow { animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 0; } 50% { opacity: .12; } }
+.t-disp { z-index: 1; display: flex; flex-direction: column; align-items: center; }
+#t-min-sec {
+  font-size: clamp(64px, 16vw, 88px); font-weight: 500;
+  font-variant-numeric: tabular-nums; letter-spacing: -2px; line-height: 1;
+  transform-origin: center;
+}
+#t-min-sec.urgent { color: var(--c-primary); font-weight: 700; }
+#t-cs {
+  font-size: 24px; font-weight: 500; color: var(--c-primary);
+  font-variant-numeric: tabular-nums; font-family: 'DM Mono', monospace;
+  letter-spacing: 0; margin-top: 8px; opacity: .9;
+}
+
+/* ELEGANT TIMER PRESETS (GRID) */
+.t-presets {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+  margin-top: 48px; width: 100%; max-width: 360px;
+  transition: opacity .5s var(--ease-std), transform .5s var(--ease-std);
+}
+.t-btn {
+  background: var(--c-surface-ctr); border-radius: var(--r-l); height: 80px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  cursor: pointer; user-select: none; position: relative; overflow: hidden;
+  transition: transform .2s var(--ease-out), background .2s;
+}
+.t-btn::before { content: ''; position: absolute; inset: 0; background: var(--c-on-surface); opacity: 0; transition: opacity .2s; }
+.t-btn:active { transform: scale(0.9); }
+.t-btn:active::before { opacity: 0.08; }
+.t-val { font-size: 26px; font-weight: 500; color: var(--c-primary); line-height: 1; font-variant-numeric: tabular-nums; }
+.t-lbl { font-size: 11px; font-weight: 700; color: var(--c-on-surface-var); letter-spacing: 1px; margin-top: 6px; }
+.t-btn.clear { background: transparent; border: 2px solid var(--c-surface-ctr-hi); }
+.t-btn.clear .t-val { color: var(--c-error); font-size: 15px; font-weight: 700; letter-spacing: 1px; margin-top: 0; }
+
+/* FOCUS MODE */
+#v-timer.is-running .t-presets { opacity: 0; pointer-events: none; transform: translateY(40px) scale(0.95); }
+#v-timer.is-running .ring-wrap { transform: scale(1.15); }
+
+/* ─────── STOPWATCH VIEW ─────── */
+#v-sw { padding-top: max(env(safe-area-inset-top), 64px); }
+.sw-top { text-align: center; padding: 24px 32px 40px; flex-shrink: 0; }
+#sw-hms {
+  font-size: clamp(64px, 18vw, 96px); font-weight: 500;
+  letter-spacing: -3px; font-variant-numeric: tabular-nums; line-height: 1;
+}
+#sw-cs {
+  display: block; font-size: clamp(24px, 6vw, 32px); font-weight: 500;
+  color: var(--c-primary); font-variant-numeric: tabular-nums;
+  font-family: 'DM Mono', monospace; letter-spacing: 0; margin-top: 12px;
+}
+.laps-scroll {
+  flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; 
+  padding: 0 24px max(calc(env(safe-area-inset-bottom) + 160px), 180px); scroll-behavior: smooth;
+}
+.laps-scroll::-webkit-scrollbar { display: none; }
+.laps-empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 64px 24px; gap: 16px; opacity: .4;
+}
+.laps-empty svg { width: 40px; height: 40px; fill: var(--c-on-surface-var); }
+.laps-empty span { font-size: 15px; font-weight: 600; color: var(--c-on-surface-var); }
+.lap-row {
+  display: flex; align-items: center; padding: 24px 28px; gap: 16px;
+  background: var(--c-surface-ctr); border-radius: var(--r-l); margin-bottom: 16px;
+  position: relative; overflow: hidden;
+  animation: lapIn .4s var(--ease-out) both;
+}
+.lap-row::before { content: ''; position: absolute; inset: 0; background: var(--c-on-surface); opacity: 0; transition: opacity .2s; }
+.lap-row:active { transform: scale(0.98); transition: transform .2s; }
+.lap-row:active::before { opacity: .06; }
+.lap-row.best .lap-split { color: var(--c-primary); font-weight: 700; }
+.lap-row.worst { opacity: .6; }
+@keyframes lapIn { from { opacity: 0; transform: translateY(-16px) scale(0.98); } to { opacity: 1; transform: none; } }
+.lap-num { font-size: 15px; font-weight: 700; color: var(--c-on-surface-var); min-width: 60px; }
+.lap-split { font-size: 20px; font-weight: 500; font-family: 'DM Mono', monospace; font-variant-numeric: tabular-nums; flex: 1; color: var(--c-on-surface); }
+.lap-total { font-size: 15px; font-weight: 400; font-family: 'DM Mono', monospace; font-variant-numeric: tabular-nums; color: var(--c-on-surface-var); opacity: .7; }
+
+/* ─────── WORLD CLOCK VIEW ─────── */
+#v-world { padding-top: max(env(safe-area-inset-top), 64px); }
+.w-hdr {
+  display: flex; align-items: center; gap: 12px; padding: 0 32px 32px;
+  font-size: 13px; font-weight: 700; letter-spacing: 4px;
+  color: var(--c-primary); text-transform: uppercase; flex-shrink: 0;
+}
+.w-scroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; padding: 0 24px max(calc(env(safe-area-inset-bottom) + 160px), 180px); }
+.w-scroll::-webkit-scrollbar { display: none; }
+.tz-row {
+  display: flex; align-items: center; padding: 24px 28px; gap: 20px;
+  background: var(--c-surface-ctr); border-radius: var(--r-l); margin-bottom: 16px;
+  position: relative; overflow: hidden;
+}
+.tz-row::before { content: ''; position: absolute; inset: 0; background: var(--c-on-surface); opacity: 0; transition: opacity .2s; }
+.tz-row:active { transform: scale(0.98); transition: transform .2s; }
+.tz-row:active::before { opacity: .06; }
+.tz-flag { font-size: 32px; flex-shrink: 0; width: 40px; text-align: center; }
+.tz-info { flex: 1; min-width: 0; }
+.tz-city { font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
+.tz-zone { font-size: 13px; color: var(--c-on-surface-var); font-weight: 500; margin-top: 6px; }
+.tz-right { text-align: right; flex-shrink: 0; }
+.tz-time { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -1px; font-family: 'DM Sans', sans-serif; }
+.tz-day { font-size: 12px; font-weight: 700; color: var(--c-on-surface-var); text-transform: uppercase; letter-spacing: .5px; margin-top: 6px; }
+
+/* ─────── FLOATING DYNAMIC NAV (100% 自适应防溢出) ─────── */
+#nav {
+  position: fixed;
+  bottom: max(calc(env(safe-area-inset-bottom) + 16px), 24px);
+  left: 50%; transform: translateX(-50%);
+  background: var(--c-surface-ctr-hi);
+  border-radius: 100px;
+  display: flex; padding: 6px; gap: 4px;
+  box-shadow: 0 16px 40px rgba(186, 26, 26, 0.08), 0 8px 20px rgba(0,0,0,0.06);
+  z-index: 600; 
+  width: calc(100% - 32px); /* 宽度随屏幕自适应 */
+  max-width: 360px; /* 限制大屏上的最大宽度 */
+  justify-content: space-between;
+}
+.ni {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  border-radius: 100px; padding: 10px 14px; height: 48px;
+  flex: 1; /* 平等均分空间 */
+  cursor: pointer; user-select: none; color: var(--c-on-surface-var);
+  transition: all .3s var(--ease-std);
+}
+.ni svg { width: 24px; height: 24px; fill: currentColor; flex-shrink: 0; transition: transform .2s var(--ease-out); }
+.ni:active svg { transform: scale(.85); }
+.ni-label {
+  font-size: 14px; font-weight: 700; letter-spacing: .3px;
+  max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap;
+  transition: max-width .3s var(--ease-std), opacity .2s var(--ease-std), margin .3s var(--ease-std);
+}
+.ni.active { 
+  flex: 1.6; /* 选中项向外平滑展开 */
+  background: var(--c-secondary-ctr); color: var(--c-on-secondary-ctr); 
+}
+.ni.active .ni-label { max-width: 100px; opacity: 1; margin-left: 8px; }
+.badge {
+  position: absolute; top: 10px; right: 12px; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--c-primary); border: 2px solid var(--c-surface-ctr-hi);
+  z-index: 2; transform: scale(0); transition: transform .3s var(--ease-out);
+}
+.ni.active .badge { border-color: var(--c-secondary-ctr); right: auto; left: 32px; }
+.badge.on { transform: scale(1); }
+
+/* ─────── FAB ─────── */
+.fab-wrap {
+  position: fixed;
+  bottom: max(calc(env(safe-area-inset-bottom) + 96px), 108px);
+  right: 32px; display: flex; flex-direction: column; align-items: flex-end; gap: 16px;
+  z-index: 500;
+}
+.fab {
+  height: 64px; border-radius: var(--r-l);
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 0 28px; font-family: 'DM Sans', sans-serif; font-size: 16px;
+  font-weight: 700; letter-spacing: .5px; cursor: pointer; user-select: none;
+  position: relative; overflow: hidden; white-space: nowrap;
+  transition: transform .2s var(--ease-out), box-shadow .2s var(--ease-std);
+}
+.fab::before { content: ''; position: absolute; inset: 0; border-radius: inherit; background: currentColor; opacity: 0; transition: opacity .2s; }
+.fab:active { transform: scale(.92); }
+.fab:active::before { opacity: .12; }
+.fab svg { width: 26px; height: 26px; fill: currentColor; flex-shrink: 0; }
+#fab-main { background: var(--c-primary-ctr); color: var(--c-on-primary-ctr); box-shadow: 0 8px 20px rgba(0,0,0,.12); }
+#fab-sec {
+  height: 52px; width: 52px; padding: 0; border-radius: var(--r-m);
+  background: var(--c-surface-ctr-hi); color: var(--c-on-surface-var);
+  box-shadow: 0 4px 12px rgba(0,0,0,.08); display: none;
+}
+#fab-sec.on { display: flex; }
+#fab-label { display: inline-block; max-width: 80px; overflow: hidden; transition: max-width .3s var(--ease-out), opacity .2s; }
+#fab-label.gone { max-width: 0; opacity: 0; }
+
+/* ─────── EFFECTS & SNACKBAR ─────── */
+#cv { position: fixed; inset: 0; pointer-events: none; z-index: 800; }
+#flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 9000; }
+#snack {
+  position: fixed; top: max(env(safe-area-inset-top), 32px);
+  left: 50%; transform: translateX(-50%) translateY(-20px);
+  background: var(--c-inverse-surface); color: var(--c-inverse-on);
+  padding: 0 24px; height: 56px; border-radius: var(--r-full);
+  font-size: 16px; font-weight: 600; display: flex; align-items: center; white-space: nowrap;
+  opacity: 0; pointer-events: none; z-index: 2000; box-shadow: 0 12px 32px rgba(0,0,0,.15);
+  transition: opacity .3s var(--ease-std), transform .3s var(--ease-std);
+}
+#snack.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ─────── LANDSCAPE ─────── */
+@media (orientation: landscape) {
+  #v-clock { flex-direction: row; flex-wrap: nowrap; overflow: hidden; }
+  #hdr { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; padding: max(env(safe-area-inset-top), 24px) 40px 0 max(env(safe-area-inset-left), 40px); width: 50%; }
+  #brand { margin-bottom: 20px; }
+  #clock { font-size: clamp(64px, 12vw, 100px); }
+  #sec { font-size: clamp(16px, 3vw, 24px); }
+  #strip { flex-direction: column; overflow-x: hidden; overflow-y: auto; padding: max(env(safe-area-inset-top), 24px) 0 24px 0; flex: 0 0 110px; gap: 16px; scroll-snap-type: y proximity; }
+  .frame { min-width: unset; width: 90px; height: 72px; padding: 12px; flex-direction: row; align-items: center; gap: 10px; scroll-snap-align: center; }
+  .f-m, .f-e { display: none; }
+  .f-d { font-size: 28px; margin-top: 0; }
+  #card { flex: 1; min-height: 0; margin: 32px 32px 120px max(calc(env(safe-area-inset-right) + 24px), 32px); }
+  #v-timer { flex-direction: row; gap: 48px; padding: max(env(safe-area-inset-top), 32px) 40px 120px; }
+  .ring-wrap { width: min(50vh, 280px); height: min(50vh, 280px); }
+  .t-presets { margin-top: 0; max-width: 360px; }
+  #v-sw { flex-direction: row; }
+  .sw-top { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; width: 45%; padding: max(env(safe-area-inset-top), 32px) 32px 32px 40px; }
+  .laps-scroll { padding: max(env(safe-area-inset-top), 32px) 40px 120px 0; }
+  #v-world { flex-direction: row; }
+  .w-hdr { flex: 0 0 auto; flex-direction: column; justify-content: flex-start; width: 70px; padding: max(env(safe-area-inset-top), 64px) 20px 32px; writing-mode: vertical-lr; text-orientation: mixed; gap: 12px; letter-spacing: 4px; }
+  .w-scroll { padding: max(env(safe-area-inset-top), 32px) 40px 120px 0; }
+}
+</style>
+</head>
+<body>
+
+<div id="flash"></div>
+<canvas id="cv"></canvas>
+<div id="snack"></div>
+
+<div id="app">
+  <!-- CLOCK -->
+  <div id="v-clock" class="view active">
+    <div id="hdr" onclick="snapToday()">
+      <div id="brand"><div id="led"></div><span id="brand-name">YOMI TIME</span></div>
+      <div class="time-row">
+        <div id="clock">00:00</div>
+        <div id="sec">:00</div>
+        <div id="ampm">AM</div>
+      </div>
+      <div id="meta">CALIBRATING…</div>
+    </div>
+    <div id="strip"></div>
+    <div id="card">
+      <div id="v-title">—</div>
+      <div id="v-body">—</div>
+    </div>
+  </div>
+
+  <!-- TIMER -->
+  <div id="v-timer" class="view">
+    <div class="ring-wrap" id="ring-wrap">
+      <svg class="ring-svg" viewBox="0 0 100 100">
+        <circle class="ring-track" cx="50" cy="50" r="44"/>
+        <circle class="ring-glow" cx="50" cy="50" r="44" id="ring-glow"/>
+        <circle class="ring-prog" cx="50" cy="50" r="44" id="ring-prog"/>
+      </svg>
+      <div class="t-disp">
+        <div id="t-min-sec">00:00</div>
+        <div id="t-cs">.00</div>
+      </div>
+    </div>
+    
+    <!-- ELEGANT TOUCH GRID -->
+    <div class="t-presets">
+      <div class="t-btn" onclick="addTimer(60)">
+        <span class="t-val">+1</span><span class="t-lbl">MIN</span>
+      </div>
+      <div class="t-btn" onclick="addTimer(180)">
+        <span class="t-val">+3</span><span class="t-lbl">MIN</span>
+      </div>
+      <div class="t-btn" onclick="addTimer(300)">
+        <span class="t-val">+5</span><span class="t-lbl">MIN</span>
+      </div>
+      <div class="t-btn" onclick="addTimer(600)">
+        <span class="t-val">+10</span><span class="t-lbl">MIN</span>
+      </div>
+      <div class="t-btn" onclick="addTimer(1800)">
+        <span class="t-val">+30</span><span class="t-lbl">MIN</span>
+      </div>
+      <div class="t-btn clear" onclick="resetTimer()">
+        <span class="t-val">CLEAR</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- STOPWATCH -->
+  <div id="v-sw" class="view">
+    <div class="sw-top">
+      <div id="sw-hms">00:00</div>
+      <span id="sw-cs">.00</span>
+    </div>
+    <div class="laps-scroll" id="laps-scroll">
+      <div id="laps-box">
+        <div class="laps-empty" id="laps-empty">
+          <svg viewBox="0 0 24 24"><path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+          <span>Laps will appear here</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORLD CLOCK -->
+  <div id="v-world" class="view">
+    <div class="w-hdr"><div id="led2"></div>WORLD</div>
+    <div class="w-scroll">
+      <div id="w-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- FAB -->
+<div class="fab-wrap">
+  <div id="fab-sec" class="fab" onclick="fabSec()">
+    <svg id="fab-sec-icon" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+  </div>
+  <div id="fab-main" class="fab" onclick="fabMain()">
+    <svg id="fab-icon" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+    <span id="fab-label">TODAY</span>
+  </div>
+</div>
+
+<!-- FLOATING DYNAMIC NAV -->
+<nav id="nav">
+  <div class="ni active" onclick="go('clock',this)">
+    <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+    <span class="ni-label">Clock</span>
+  </div>
+  <div class="ni" onclick="go('timer',this)">
+    <div class="badge" id="b-timer"></div>
+    <svg viewBox="0 0 24 24"><path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+    <span class="ni-label">Timer</span>
+  </div>
+  <div class="ni" onclick="go('sw',this)">
+    <div class="badge" id="b-sw"></div>
+    <svg viewBox="0 0 24 24"><path d="M22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM7.88 3.39L6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM12.5 8H11v6l4.75 2.85.75-1.23-4-2.37V8zM12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 16c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+    <span class="ni-label">Stopwatch</span>
+  </div>
+  <div class="ni" onclick="go('world',this)">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+    <span class="ni-label">World</span>
+  </div>
+</nav>
+
+<script>
+/* ═══════════════════════ DATA ═══════════════════════ */
+const DB = {
+  "01-01":{n:"元旦", d:"时间的矢量在此处重置。",egg:"burst"},
+  "01-15":{n:"元宵节", d:"正月十五，火树银花，千灯如昼。"},
+  "02-04":{n:"立春", d:"东风解冻，蛰虫始振，春回大地。"},
+  "02-14":{n:"情人节", d:"Valentine's Day."},
+  "03-08":{n:"妇女节", d:"致敬所有女性。"},
+  "03-21":{n:"春分", d:"昼夜等长，春和景明。"},
+  "04-04":{n:"清明", d:"慎终追远，寒食祭祖。"},
+  "04-22":{n:"地球日", d:"EARTH DAY. 珍视这颗蓝色星球。"},
+  "05-01":{n:"劳动节", d:"致敬一切辛勤的劳动者。",egg:"burst"},
+  "05-05":{n:"立夏", d:"夏季伊始，万物竞长。"},
+  "06-01":{n:"儿童节", d:"愿所有人永葆赤子之心。"},
+  "06-04":{n:"", d:"今日静默。",isMourning:true},
+  "06-21":{n:"夏至", d:"一年中白昼最长的一天。"},
+  "07-07":{n:"七夕", d:"银汉迢迢暗渡。"},
+  "08-07":{n:"立秋", d:"暑气渐消，金风送爽。"},
+  "09-09":{n:"重阳", d:"登高望远，遥寄思念。"},
+  "09-19":{n:"摄影日", d:"WORLD PHOTOGRAPHY DAY. 致敬定格瞬间的观察者。",egg:"flash"},
+  "09-23":{n:"秋分", d:"金秋平分昼夜。"},
+  "10-01":{n:"国庆节", d:"举国同庆，盛世繁荣。",egg:"burst"},
+  "11-07":{n:"立冬", d:"冬季伊始，万物收藏。"},
+  "12-13":{n:"", d:"国家公祭日。铭记历史，守望和平。",isMourning:true},
+  "12-22":{n:"冬至", d:"一年中最长的夜，此后光明渐回。"},
+  "12-25":{n:"圣诞节", d:"Merry Christmas."},
+  "12-31":{n:"跨年夜", d:"另一段时间的序章即将开始。",egg:"burst"},
+};
+const MO=["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE","JULY","AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"];
+const WK=["SUN","MON","TUE","WED","THU","FRI","SAT"];
+const TZ=[
+  {c:"New York", z:"America/New_York", f:"🇺🇸"},
+  {c:"London", z:"Europe/London", f:"🇬🇧"},
+  {c:"Paris", z:"Europe/Paris", f:"🇫🇷"},
+  {c:"Moscow", z:"Europe/Moscow", f:"🇷🇺"},
+  {c:"Dubai", z:"Asia/Dubai", f:"🇦🇪"},
+  {c:"Mumbai", z:"Asia/Kolkata", f:"🇮🇳"},
+  {c:"Singapore", z:"Asia/Singapore", f:"🇸🇬"},
+  {c:"Tokyo", z:"Asia/Tokyo", f:"🇯🇵"},
+  {c:"Sydney", z:"Australia/Sydney", f:"🇦🇺"},
+  {c:"São Paulo", z:"America/Sao_Paulo", f:"🇧🇷"},
+  {c:"Los Angeles", z:"America/Los_Angeles", f:"🇺🇸"},
+];
+
+const ICONS={
+  today:'<path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/>',
+  play: '<path d="M8 5v14l11-7z"/>',
+  pause:'<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>',
+  stop: '<path d="M6 6h12v12H6z"/>',
+  lap:  '<path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z"/>',
+  world:'<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>',
+};
+
+/* ═══════════════════════ UTILS ═══════════════════════ */
+const $ = id => document.getElementById(id);
+function pad(n) { const s = String(Math.floor(Math.max(0, n))); return s.length < 2 ? '0' + s : s; }
+function key(d) { return pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function tryVibrate(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch(e){} }
+
+/* ═══════════════════════ STATE ═══════════════════════ */
+let tab = 'clock';
+// timer
+let tTotal = 0, tLeft = 0, tRunning = false, tEnd = 0, tRaf = null;
+// stopwatch
+let swStart = 0, swElapsed = 0, swRunning = false, swRaf = null, swLapCount = 0, swLaps = [];
+let lastSwHms = "", lastSwCs = ""; 
+// fx
+let ptcls = [], fxRaf = null;
+// world
+let wTimer = null;
+
+/* ═══════════════════════ INIT (Xiaomi 15 Lazy Load) ═══════════════════════ */
+window.addEventListener('load', () => {
+  buildStrip(); syncClock(); updateFAB(); buildWorld();
+});
+
+/* ═══════════════════════ NAVIGATION ═══════════════════════ */
+function go(t, el) {
+  if (tab === t) return;
+  
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  $(`v-${t}`).classList.add('active');
+  
+  tab = t;
+  
+  document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  
+  tryVibrate(4);
+  updateFAB();
+  if (t === 'world') tickWorld();
+}
+
+/* ═══════════════════════ FAB ═══════════════════════ */
+function updateFAB() {
+  const icon = $('fab-icon'), lbl = $('fab-label');
+  const sec = $('fab-sec'), secIcon = $('fab-sec-icon');
+  sec.classList.remove('on');
+  
+  if (tab === 'clock') {
+    icon.innerHTML = ICONS.today; lbl.textContent = 'TODAY'; lbl.classList.remove('gone');
+  } else if (tab === 'timer') {
+    icon.innerHTML = tRunning ? ICONS.pause : ICONS.play;
+    lbl.textContent = tRunning ? 'PAUSE' : 'START'; lbl.classList.remove('gone');
+    if (tTotal > 0) { sec.classList.add('on'); secIcon.innerHTML = ICONS.stop; }
+    $('b-timer').classList.toggle('on', tRunning);
+  } else if (tab === 'sw') {
+    icon.innerHTML = swRunning ? ICONS.pause : ICONS.play;
+    lbl.textContent = swRunning ? 'PAUSE' : 'START'; lbl.classList.remove('gone');
+    if (swElapsed > 0 || swRunning) { sec.classList.add('on'); secIcon.innerHTML = swRunning ? ICONS.lap : ICONS.stop; }
+    $('b-sw').classList.toggle('on', swRunning);
+  } else if (tab === 'world') {
+    icon.innerHTML = ICONS.world; lbl.textContent = 'REFRESH'; lbl.classList.remove('gone');
+  }
+}
+
+function fabMain() {
+  if (tab === 'clock') snapToday();
+  else if (tab === 'timer') toggleTimer();
+  else if (tab === 'sw') toggleSW();
+  else if (tab === 'world') { tickWorld(); snack('Refreshed'); }
+}
+function fabSec() {
+  if (tab === 'timer') resetTimer();
+  else if (tab === 'sw') { if (swRunning) recordLap(); else resetSW(); }
+}
+
+/* ═══════════════════════ CLOCK ═══════════════════════ */
+function buildStrip() {
+  const strip = $('strip'), today = new Date(); today.setHours(0,0,0,0);
+  const frag = document.createDocumentFragment();
+  for (let i = -30; i <= 365; i++) {
+    const d = new Date(today); d.setDate(today.getDate() + i);
+    const k = key(d), inf = DB[k] || null, el = document.createElement('div');
+    el.className = 'frame' + (i === 0 ? ' today-frame' : '');
+    if (inf && inf.isMourning) {
+      el.innerHTML = `<div><div class="f-m">${d.getMonth()+1}月</div><div class="f-d">${d.getDate()}</div></div><div><div class="f-w">${WK[d.getDay()]}</div><div class="f-e"></div></div>`;
+    } else {
+      el.innerHTML = `<div><div class="f-m">${d.getMonth()+1}月</div><div class="f-d">${d.getDate()}</div></div><div><div class="f-w">${WK[d.getDay()]}</div><div class="f-e">${inf?inf.n:''}</div></div>`;
+    }
+    el.addEventListener('click', e => pickDay(el, d, inf, e));
+    frag.appendChild(el);
+  }
+  strip.appendChild(frag); snapToday();
+}
+
+function pickDay(el, d, inf, e) {
+  document.querySelectorAll('.frame.active').forEach(f => f.classList.remove('active'));
+  el.classList.add('active');
+  
+  // MATH-BASED CENTERING (MIUI/Chromium WebView dead-loop crash fix)
+  const strip = $('strip');
+  if (strip) {
+    if (window.innerWidth > window.innerHeight) {
+      const target = el.offsetTop - (strip.clientHeight / 2) + (el.offsetHeight / 2);
+      strip.scrollTo({ top: target, behavior: 'smooth' });
+    } else {
+      const target = el.offsetLeft - (strip.clientWidth / 2) + (el.offsetWidth / 2);
+      strip.scrollTo({ left: target, behavior: 'smooth' });
+    }
+  }
+  
+  const meta = $('meta');
+  meta.style.opacity = '0'; meta.style.transform = 'translateY(5px)';
+  setTimeout(() => {
+    meta.textContent = `${d.getFullYear()} · ${MO[d.getMonth()]} · ${pad(d.getDate())}`;
+    meta.style.transition = 'opacity .2s, transform .3s var(--ease-out)';
+    meta.style.opacity = '1'; meta.style.transform = 'none';
+  }, 70);
+  
+  const card = $('card'); card.style.opacity = '0';
+  setTimeout(() => {
+    $('v-title').textContent = (inf && inf.n) ? inf.n : 'REALTIME';
+    $('v-body').textContent = (inf && inf.d) ? inf.d : '一切如常。未发现显著的时间异常。';
+    card.style.transition = 'opacity .15s'; card.style.opacity = '1';
+  }, 140);
+  
+  document.body.classList.toggle('mourning', !!(inf && inf.isMourning));
+  if (inf && inf.egg && e) fxBurst(e);
+  if (inf && inf.egg === 'flash') fxFlash();
+  tryVibrate(6);
+}
+
+function snapToday() {
+  requestAnimationFrame(() => {
+    const el = document.querySelector('.today-frame'); if (!el) return;
+    const d = new Date(); d.setHours(0,0,0,0);
+    pickDay(el, d, DB[key(d)] || null, null);
+  });
+}
+
+function syncClock() {
+  const n = new Date();
+  $('clock').textContent = pad(n.getHours()) + ':' + pad(n.getMinutes());
+  $('sec').textContent = ':' + pad(n.getSeconds());
+  $('ampm').textContent = n.getHours() < 12 ? 'AM' : 'PM';
+  
+  const msToNextSec = 1000 - n.getMilliseconds();
+  setTimeout(syncClock, msToNextSec);
+}
+
+/* ═══════════════════════ TIMER ═══════════════════════ */
+const RING = 276.46;
+
+function popTimeAnim() {
+  const el = $('t-min-sec');
+  el.style.transition = 'none';
+  el.style.transform = 'scale(1.08)';
+  el.style.color = 'var(--c-primary)';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    el.style.transition = 'transform 0.4s var(--ease-out), color 0.4s var(--ease-out)';
+    el.style.transform = 'none';
+    el.style.color = '';
+  }));
+}
+
+function addTimer(sec) {
+  if (tRunning) return;
+  tTotal = Math.max(0, tTotal + sec); tLeft = tTotal;
+  updateTimerUI(); updateFAB();
+  popTimeAnim();
+  tryVibrate(5);
+}
+
+function resetTimer() {
+  tRunning = false; tTotal = 0; tLeft = 0;
+  if (tRaf) { cancelAnimationFrame(tRaf); tRaf = null; }
+  $('v-timer').classList.remove('is-running');
+  $('ring-wrap').classList.remove('running');
+  $('t-min-sec').classList.remove('urgent');
+  updateTimerUI(); updateFAB();
+}
+
+function toggleTimer() {
+  if (tTotal === 0) return;
+  if (tRunning) {
+    tRunning = false; tLeft = Math.max(0, (tEnd - Date.now()) / 1000);
+    if (tRaf) { cancelAnimationFrame(tRaf); tRaf = null; }
+    $('v-timer').classList.remove('is-running');
+    $('ring-wrap').classList.remove('running');
+  } else {
+    tRunning = true; tEnd = Date.now() + tLeft * 1000;
+    $('v-timer').classList.add('is-running');
+    $('ring-wrap').classList.add('running');
+    tRaf = requestAnimationFrame(tickTimer);
+  }
+  updateFAB();
+}
+
+function tickTimer() {
+  if (!tRunning) return;
+  tLeft = Math.max(0, (tEnd - Date.now()) / 1000);
+  updateTimerUI();
+  if (tLeft <= 0) {
+    tRunning = false; tTotal = 0; tLeft = 0;
+    if (tRaf) { cancelAnimationFrame(tRaf); tRaf = null; }
+    $('v-timer').classList.remove('is-running');
+    $('ring-wrap').classList.remove('running');
+    $('t-min-sec').classList.remove('urgent');
+    updateTimerUI(); updateFAB();
+    fxFlash(); snack('Timer complete ✓');
+    tryVibrate([200, 100, 200, 100, 200]);
+  } else {
+    $('t-min-sec').classList.toggle('urgent', tLeft < 10);
+    tRaf = requestAnimationFrame(tickTimer);
+  }
+}
+
+function updateTimerUI() {
+  const m = Math.floor(tLeft / 60), s = Math.floor(tLeft % 60);
+  const cs = Math.floor((tLeft % 1) * 100);
+  $('t-min-sec').textContent = pad(m) + ':' + pad(s);
+  $('t-cs').textContent = '.' + pad(cs);
+  
+  const ratio = tTotal > 0 ? (tLeft / tTotal) : 1;
+  const off = Math.max(0, Math.min(RING, RING * (1 - ratio)));
+  $('ring-prog').style.strokeDashoffset = off;
+  $('ring-glow').style.strokeDashoffset = off;
+}
+
+/* ═══════════════════════ STOPWATCH ═══════════════════════ */
+function toggleSW() {
+  if (swRunning) {
+    swRunning = false; swElapsed += Date.now() - swStart;
+    if (swRaf) { cancelAnimationFrame(swRaf); swRaf = null; }
+  } else {
+    swRunning = true; swStart = Date.now();
+    swRaf = requestAnimationFrame(tickSW);
+  }
+  updateFAB();
+}
+function resetSW() {
+  swRunning = false; swElapsed = 0; swLapCount = 0; swLaps = [];
+  if (swRaf) { cancelAnimationFrame(swRaf); swRaf = null; }
+  lastSwHms = ""; lastSwCs = ""; 
+  updateSWUI(0); updateFAB();
+  
+  const box = $('laps-box');
+  box.style.transition = 'opacity .2s'; box.style.opacity = '0';
+  setTimeout(() => {
+    box.innerHTML = '<div class="laps-empty" id="laps-empty"><svg viewBox="0 0 24 24"><path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg><span>Laps will appear here</span></div>';
+    box.style.opacity = '1';
+  }, 200);
+  $('b-sw').classList.remove('on');
+}
+function fmtSW(ms) {
+  ms = Math.max(0, ms);
+  return pad(Math.floor(ms / 60000)) + ':' + pad(Math.floor((ms % 60000) / 1000)) + '.' + pad(Math.floor((ms % 1000) / 10));
+}
+function updateSWUI(ms) {
+  ms = Math.max(0, ms);
+  const hms = pad(Math.floor(ms / 60000)) + ':' + pad(Math.floor((ms % 60000) / 1000));
+  const cs = '.' + pad(Math.floor((ms % 1000) / 10));
+  
+  if (hms !== lastSwHms) { $('sw-hms').textContent = hms; lastSwHms = hms; }
+  if (cs !== lastSwCs) { $('sw-cs').textContent = cs; lastSwCs = cs; }
+}
+function tickSW() {
+  if (!swRunning) return;
+  updateSWUI(swElapsed + (Date.now() - swStart));
+  swRaf = requestAnimationFrame(tickSW);
+}
+function recordLap() {
+  if (!swRunning) return;
+  swLapCount++;
+  const total = swElapsed + (Date.now() - swStart);
+  const prev = swLaps.length > 0 ? swLaps[swLaps.length - 1].total : 0;
+  const split = total - prev;
+  swLaps.push({ split, total });
+  
+  const empty = document.getElementById('laps-empty');
+  if (empty) empty.remove();
+  
+  const row = document.createElement('div');
+  row.className = 'lap-row';
+  row.innerHTML = `<span class="lap-num">Lap ${pad(swLapCount)}</span><span class="lap-split">${fmtSW(split)}</span><span class="lap-total">${fmtSW(total)}</span>`;
+  
+  const box = $('laps-box');
+  box.firstChild ? box.insertBefore(row, box.firstChild) : box.appendChild(row);
+  $('laps-scroll').scrollTop = 0; 
+  
+  refreshLapColors();
+  tryVibrate(10);
+}
+function refreshLapColors() {
+  if (swLaps.length < 2) return;
+  const sp = swLaps.map(l => l.split);
+  const best = Math.min(...sp), worst = Math.max(...sp);
+  $('laps-box').querySelectorAll('.lap-row').forEach((row, i) => {
+    const idx = swLaps.length - 1 - i;
+    row.classList.remove('best', 'worst');
+    if (swLaps[idx].split === best) row.classList.add('best');
+    else if (swLaps[idx].split === worst) row.classList.add('worst');
+  });
+}
+
+/* ═══════════════════════ WORLD CLOCK ═══════════════════════ */
+function buildWorld() {
+  const list = $('w-list'); list.innerHTML = '';
+  TZ.forEach(tz => {
+    const row = document.createElement('div'); row.className = 'tz-row'; row.dataset.z = tz.z;
+    row.innerHTML = `<div class="tz-flag">${tz.f}</div><div class="tz-info"><div class="tz-city">${tz.c}</div><div class="tz-zone">${tz.z.replace(/_/g, ' ')}</div></div><div class="tz-right"><div class="tz-time" data-t></div><div class="tz-day" data-d></div></div>`;
+    list.appendChild(row);
+  });
+  tickWorld();
+}
+function tickWorld() {
+  const now = Date.now();
+  
+  $('w-list').querySelectorAll('.tz-row').forEach(row => {
+    const z = row.dataset.z;
+    try {
+      const fmtTime = new Intl.DateTimeFormat('en-GB', { timeZone: z, hour: '2-digit', minute: '2-digit', hour12: false });
+      let ts = fmtTime.format(now);
+      if (ts.startsWith('24')) ts = '00' + ts.slice(2);
+      row.querySelector('[data-t]').textContent = ts;
+      
+      const fmtDate = new Intl.DateTimeFormat('en-US', { timeZone: z, weekday: 'short', month: 'short', day: 'numeric' });
+      row.querySelector('[data-d]').textContent = fmtDate.format(now).toUpperCase();
+    } catch(e) {
+      row.querySelector('[data-t]').textContent = '--:--';
+    }
+  });
+  
+  if (wTimer) clearTimeout(wTimer);
+  const msToNext = (60 - new Date().getSeconds()) * 1000 - new Date().getMilliseconds();
+  wTimer = setTimeout(tickWorld, msToNext + 50);
+}
+
+/* ═══════════════════════ EFFECTS ═══════════════════════ */
+function fxFlash() {
+  const f = $('flash');
+  f.style.transition = 'none'; f.style.opacity = '.8';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    f.style.transition = 'opacity .6s cubic-bezier(0.2,0,0,1)'; f.style.opacity = '0';
+  }));
+}
+function fxBurst(e) {
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  cv.width = innerWidth; cv.height = innerHeight;
+  const cx = e ? e.clientX : innerWidth / 2, cy = e ? e.clientY : innerHeight / 2;
+  const cols = ['#BA1A1A', '#FFDAD6', '#410002', '#FFB4AB', '#201A19'];
+  const pts = Array.from({ length: 72 }, (_, i) => {
+    const a = Math.PI * 2 * i / 72 + Math.random() * .2 - .1;
+    const sp = Math.random() * 10 + 5;
+    return {
+      x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - Math.random() * 3,
+      life: 1, dec: .012 + Math.random() * .01, sz: Math.random() * 4 + 1.5,
+      col: cols[Math.floor(Math.random() * cols.length)], circle: Math.random() > .3
+    };
+  });
+  ptcls.push(...pts);
+  if (!fxRaf) (function loop() {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    let alive = false;
+    for (let i = ptcls.length - 1; i >= 0; i--) {
+      const p = ptcls[i]; if (p.life <= 0) { ptcls.splice(i, 1); continue; }
+      alive = true; p.vx *= .95; p.vy += .22; p.x += p.vx; p.y += p.vy; p.life -= p.dec;
+      ctx.globalAlpha = Math.max(0, p.life * p.life); ctx.fillStyle = p.col;
+      if (p.circle) { ctx.beginPath(); ctx.arc(p.x, p.y, p.sz, 0, Math.PI * 2); ctx.fill(); }
+      else ctx.fillRect(p.x - p.sz / 2, p.y - p.sz / 2, p.sz, p.sz);
+    }
+    ctx.globalAlpha = 1;
+    if (alive) fxRaf = requestAnimationFrame(loop);
+    else { fxRaf = null; ctx.clearRect(0, 0, cv.width, cv.height); }
+  })();
+}
+
+/* ═══════════════════════ SNACK ═══════════════════════ */
+let snackT = null;
+function snack(msg) {
+  const s = $('snack'); s.textContent = msg; s.classList.add('on');
+  if (snackT) clearTimeout(snackT);
+  snackT = setTimeout(() => s.classList.remove('on'), 2400);
+}
+</script>
+</body>
+</html>
